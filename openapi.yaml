@@ -1,0 +1,109 @@
+openapi: 3.1.0
+info:
+  title: OFT + EML Exporter
+  version: 1.0.0
+servers:
+  - url: https://YOUR_VERCEL_URL_HERE
+paths:
+  /preview:
+    post:
+      operationId: previewMessage
+      summary: Generate a sanitized preview (HTML + plaintext).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ComposeRequest'
+      responses:
+        '200':
+          description: Preview payload
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  subject: { type: string }
+                  htmlPreview: { type: string }
+                  textPreview: { type: string }
+                  normalized:
+                    $ref: '#/components/schemas/NormalizedFields'
+        '400': { description: Bad request }
+        '500': { description: Server error }
+  /export:
+    post:
+      operationId: exportMessage
+      summary: Export identical content as OFT and/or EML.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: '#/components/schemas/ComposeRequest'
+                - type: object
+                  properties:
+                    formats:
+                      type: array
+                      items:
+                        type: string
+                        enum: [oft, eml]
+                      default: [oft, eml]
+      responses:
+        '200':
+          description: Returns base64 files as JSON so ChatGPT can surface both downloads.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  files:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        filename: { type: string }
+                        mime: { type: string }
+                        contentBase64: { type: string }
+        '400': { description: Bad request }
+        '500': { description: Server error }
+components:
+  schemas:
+    ComposeRequest:
+      type: object
+      required: [subject]
+      properties:
+        subject: { type: string }
+        htmlBody: { type: string }
+        textBody: { type: string }
+        to: { type: array, items: { type: string, format: email } }
+        cc: { type: array, items: { type: string, format: email } }
+        bcc: { type: array, items: { type: string, format: email } }
+        attachments:
+          type: array
+          items:
+            type: object
+            required: [filename, contentBase64]
+            properties:
+              filename: { type: string }
+              contentBase64: { type: string }
+              mime: { type: string }
+        fromChain: { type: boolean, default: false }
+        chainFile:
+          type: object
+          properties:
+            filename: { type: string }
+            contentBase64: { type: string }
+            mime: { type: string, enum: ['message/rfc822','application/vnd.ms-outlook','application/octet-stream'] }
+        platformHint:
+          type: string
+          enum: [mac, windows, unknown]
+    NormalizedFields:
+      type: object
+      properties:
+        to: { type: array, items: { type: string } }
+        cc: { type: array, items: { type: string } }
+        bcc: { type: array, items: { type: string } }
+        placeholders:
+          type: array
+          items: { type: string }
